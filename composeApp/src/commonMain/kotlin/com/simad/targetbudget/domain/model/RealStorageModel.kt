@@ -20,8 +20,8 @@ data class RealStorageInsertModel(
 )
 
 enum class AccessibilityLevel {
-    FULLY_ACCESSIBLE,
-    ACCESSIBLE,
-    HARDLY_ACCESSIBLE,
-    INACCESSIBLE
+    FULLY_ACCESSIBLE,          // доступны в любой момент (карта, наличка)
+    ACCESSIBLE,                // можно снять без потерь, но с ограничениями (накопительные, на ежедневный остаток)
+    HARDLY_ACCESSIBLE,         // есть штрафы или лимиты (вклады/накопительные, на мин. остаток)
+    INACCESSIBLE               // нельзя снять (вклад без досрочного)
 }
