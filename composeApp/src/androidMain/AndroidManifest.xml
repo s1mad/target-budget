@@ -2,11 +2,12 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <application
+        android:name=".TargetBudgetApplication"
         android:icon="@mipmap/ic_launcher"
         android:label="target-budget"
         android:theme="@android:style/Theme.Material.NoActionBar">
         <activity
-            android:name=".AppActivity"
+            android:name=".TargetBudgetActivity"
             android:configChanges="orientation|screenSize|screenLayout|keyboardHidden"
             android:launchMode="singleInstance"
             android:windowSoftInputMode="adjustPan"
