@@ -5,7 +5,7 @@ data class RealStorageModel(
     val name: String,
     val balance: Long,
     val creditLimit: Long,
-    val accessibilityLevel: AccessibilityLevel,
+    val accessibility: Accessibility,
     val isArchived: Boolean,
     val updatedAt: String,
     val createdAt: String
@@ -15,13 +15,13 @@ data class RealStorageInsertModel(
     val name: String,
     val balance: Long,
     val creditLimit: Long,
-    val accessibilityLevel: AccessibilityLevel,
+    val accessibility: Accessibility,
     val isArchived: Boolean,
 )
 
-enum class AccessibilityLevel {
-    FULLY_ACCESSIBLE,          // доступны в любой момент (карта, наличка)
-    ACCESSIBLE,                // можно снять без потерь, но с ограничениями (накопительные, на ежедневный остаток)
-    HARDLY_ACCESSIBLE,         // есть штрафы или лимиты (вклады/накопительные, на мин. остаток)
-    INACCESSIBLE               // нельзя снять (вклад без досрочного)
+enum class Accessibility {
+    IMMEDIATE,          // можно получить в любой момент (карта, наличка)
+    AVAILABLE,          // можно снять без потерь, но есть ограничения (накопительные, на ежедневный остаток)
+    RESTRICTED,         // можно снять, но с потерями (вклады/накопительные, на мин. остаток)
+    LOCKED              // нельзя снять (вклад без досрочного)
 }

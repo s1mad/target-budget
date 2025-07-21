@@ -1,7 +1,7 @@
 package com.simad.targetbudget.data.sources.db
 
 import androidx.room.TypeConverter
-import com.simad.targetbudget.domain.model.AccessibilityLevel
+import com.simad.targetbudget.domain.model.Accessibility
 import kotlin.time.ExperimentalTime
 import kotlin.uuid.ExperimentalUuidApi
 
@@ -9,8 +9,8 @@ import kotlin.uuid.ExperimentalUuidApi
 class RoomConverters {
 
     @TypeConverter
-    fun fromAccessibilityLevel(level: AccessibilityLevel): String = level.name
+    fun fromAccessibilityLevel(level: Accessibility): String = level.name
 
     @TypeConverter
-    fun toAccessibilityLevel(name: String): AccessibilityLevel = AccessibilityLevel.valueOf(name)
+    fun toAccessibilityLevel(name: String): Accessibility = Accessibility.valueOf(name)
 }

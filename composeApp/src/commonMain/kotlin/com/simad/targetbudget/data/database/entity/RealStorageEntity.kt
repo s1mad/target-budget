@@ -3,7 +3,7 @@ package com.simad.targetbudget.data.database.entity
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
-import com.simad.targetbudget.domain.model.AccessibilityLevel
+import com.simad.targetbudget.domain.model.Accessibility
 
 @Entity(
     indices = [Index(value = ["name"], unique = true)]
@@ -13,7 +13,7 @@ data class RealStorageEntity(
     val name: String,
     val balance: Long,
     val creditLimit: Long,
-    val accessibilityLevel: AccessibilityLevel,
+    val accessibility: Accessibility,
     val isArchived: Boolean,
     val updatedAt: String,
     val createdAt: String,

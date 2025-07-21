@@ -1,7 +1,7 @@
 package com.simad.targetbudget.presentation.screens.budget
 
 import com.arkivanov.decompose.ComponentContext
-import com.simad.targetbudget.domain.model.AccessibilityLevel
+import com.simad.targetbudget.domain.model.Accessibility
 import com.simad.targetbudget.domain.model.DebtModel
 import com.simad.targetbudget.domain.model.RealStorageModel
 import com.simad.targetbudget.domain.model.VirtualStorageModel
@@ -23,18 +23,28 @@ interface BudgetComponent {
     fun onEvent(event: Event)
 
     data class State(
-        val realStorages: List<RealStorageModel> = emptyList(),
-        val realBalancesSum: Long = 0,
-        val realStoragesFullyAccessibleSum: Long = 0,
-        val realStoragesAccessibleSum: Long = 0,
+        val realStorageSection: RealStorageSection = RealStorageSection(),
+
         val virtualStorages: List<VirtualStorageModel> = emptyList(),
         val virtualBalancesSum: Long = 0,
+
         val debts: List<DebtModel> = emptyList(),
         val debtsPositiveSum: Long = 0,
         val debtsNegativeSum: Long = 0,
-        val accessibleBalance: Long = 0,
+
         val buffer: Long = 0,
-    )
+    ) {
+        data class RealStorageSection(
+            val groups: List<RealStorageGroup> = emptyList(),
+            val balances: Long = 0,
+        )
+
+        data class RealStorageGroup(
+            val accessibility: Accessibility,
+            val balances: Long,
+            val storages: List<RealStorageModel>
+        )
+    }
 
     sealed class Event {
 
@@ -54,20 +64,10 @@ class BudgetComponentImpl(
 
     override fun onEvent(event: BudgetComponent.Event) {}
 
-    private fun updateAccessibleBalance() {
-        state.update { current ->
-            val accessibleBalance =
-                current.realStoragesFullyAccessibleSum + current.realStoragesFullyAccessibleSum - (current.debtsPositiveSum + current.debtsNegativeSum)
-            current.copy(
-                accessibleBalance = accessibleBalance
-            )
-        }
-    }
-
     private fun updateBuffer() {
         state.update { current ->
-            val buffer =
-                current.realBalancesSum + current.debtsPositiveSum + current.debtsNegativeSum - current.virtualBalancesSum
+            val buffer = current.realStorageSection.balances + current.debtsPositiveSum +
+                    current.debtsNegativeSum - current.virtualBalancesSum
             current.copy(
                 buffer = buffer
             )
@@ -79,28 +79,38 @@ class BudgetComponentImpl(
         realStorageRepository.getAll()
             .distinctUntilChanged()
             .onEach { items ->
-                val realBalancesSum = items.sumOf { it.balance }
-                val realStoragesFullyAccessibleSum = items.sumOf {
-                    if (it.accessibilityLevel == AccessibilityLevel.FULLY_ACCESSIBLE) it.balance else 0L
-                }
-                val realStoragesAccessibleSum = items.sumOf {
-                    if (it.accessibilityLevel == AccessibilityLevel.ACCESSIBLE) it.balance else 0L
-                }
+
+                val realStorages = items
+                    .groupBy { item -> item.accessibility }
+                    .entries.map { entry ->
+                        State.RealStorageGroup(
+                            accessibility = entry.key,
+                            balances = entry.value.sumOf { it.balance },
+                            storages = entry.value
+                        )
+                    }
+                    .sortedBy {
+                        when (it.accessibility) {
+                            Accessibility.IMMEDIATE -> 0
+                            Accessibility.AVAILABLE -> 1
+                            Accessibility.RESTRICTED -> 2
+                            Accessibility.LOCKED -> 3
+                        }
+                    }
+                val balances = realStorages.sumOf { it.balances }
+
                 var bufferIsNeedUpdate = false
-                var accessibleBalanceIsNeedUpdate = false
                 state.update { current ->
-                    bufferIsNeedUpdate = realBalancesSum != current.realBalancesSum
-                    accessibleBalanceIsNeedUpdate =
-                        realStoragesFullyAccessibleSum != current.realStoragesFullyAccessibleSum || realStoragesAccessibleSum != current.realStoragesAccessibleSum
+                    bufferIsNeedUpdate = balances != current.realStorageSection.balances
                     current.copy(
-                        realStorages = items,
-                        realBalancesSum = realBalancesSum,
-                        realStoragesFullyAccessibleSum = realStoragesFullyAccessibleSum,
-                        realStoragesAccessibleSum = realStoragesAccessibleSum
+                        realStorageSection = State.RealStorageSection(
+                            groups = realStorages,
+                            balances = balances,
+                        )
+
                     )
                 }
                 if (bufferIsNeedUpdate) updateBuffer()
-                if (accessibleBalanceIsNeedUpdate) updateAccessibleBalance()
             }
             .launchIn(scope)
 
@@ -125,9 +135,9 @@ class BudgetComponentImpl(
             .onEach { items ->
                 val debtsPositiveSum = items.sumOf { if (it.balance > 0) it.balance else 0L }
                 val debtsNegativeSum = items.sumOf { if (it.balance < 0) it.balance else 0L }
-                var bufferAndAccessibleBalanceIsNeedUpdate = false
+                var bufferIsNeedUpdate = false
                 state.update { current ->
-                    bufferAndAccessibleBalanceIsNeedUpdate =
+                    bufferIsNeedUpdate =
                         debtsPositiveSum != current.debtsPositiveSum || debtsNegativeSum != current.debtsNegativeSum
                     current.copy(
                         debts = items,
@@ -135,12 +145,8 @@ class BudgetComponentImpl(
                         debtsNegativeSum = debtsNegativeSum
                     )
                 }
-                if (bufferAndAccessibleBalanceIsNeedUpdate) {
-                    updateBuffer()
-                    updateAccessibleBalance()
-                }
+                if (bufferIsNeedUpdate) updateBuffer()
             }
             .launchIn(scope)
     }
-
 }

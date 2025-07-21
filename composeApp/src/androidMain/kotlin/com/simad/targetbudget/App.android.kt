@@ -1,20 +1,25 @@
 package com.simad.targetbudget
 
-import android.R.attr.x
 import android.app.Application
 import android.content.Context
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import com.arkivanov.decompose.ComponentContext
+import com.arkivanov.decompose.DefaultComponentContext
 import com.simad.targetbudget.di.DiProvider
+import com.simad.targetbudget.presentation.screens.budget.BudgetComponent
 import org.kodein.di.bindSingleton
 
 class TargetBudgetActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        setContent { App() }
+        val rootContext = DefaultComponentContext(lifecycle = lifecycle)
+        val budgetComponentFactory: (ComponentContext) -> BudgetComponent = DiProvider.factory()
+        val budgetComponent = budgetComponentFactory(rootContext)
+        setContent { App(budgetComponent) }
     }
 }
 
