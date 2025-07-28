@@ -1,5 +1,8 @@
 package com.simad.targetbudget.domain.model
 
+import kotlinx.serialization.Serializable
+
+@Serializable
 data class RealStorageModel(
     val id: String,
     val name: String,
@@ -11,6 +14,7 @@ data class RealStorageModel(
     val createdAt: String
 )
 
+@Serializable
 data class RealStorageInsertModel(
     val name: String,
     val balance: Long,
@@ -19,6 +23,7 @@ data class RealStorageInsertModel(
     val isArchived: Boolean,
 )
 
+@Serializable
 enum class Accessibility {
     IMMEDIATE,          // можно получить в любой момент (карта, наличка)
     AVAILABLE,          // можно снять без потерь, но есть ограничения (накопительные, на ежедневный остаток)

@@ -9,7 +9,7 @@ import com.simad.targetbudget.domain.repository.DebtRepository
 import com.simad.targetbudget.domain.repository.RealStorageRepository
 import com.simad.targetbudget.domain.repository.VirtualStorageRepository
 import com.simad.targetbudget.presentation.helpers.componentCoroutineScope
-import com.simad.targetbudget.presentation.screens.budget.BudgetComponent.State
+import com.simad.targetbudget.presentation.screens.budget.BudgetListComponent.State
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -17,22 +17,15 @@ import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
 
-interface BudgetComponent {
+interface BudgetListComponent {
 
     val state: StateFlow<State>
     fun onEvent(event: Event)
 
     data class State(
         val realStorageSection: RealStorageSection = RealStorageSection(),
-
-        val virtualStorages: List<VirtualStorageModel> = emptyList(),
-        val virtualBalancesSum: Long = 0,
-
-        val debts: List<DebtModel> = emptyList(),
-        val debtsPositiveSum: Long = 0,
-        val debtsNegativeSum: Long = 0,
-
-        val buffer: Long = 0,
+        val virtualStorageSection: VirtualStorageSection = VirtualStorageSection(),
+        val debtSection: DebtSection = DebtSection(),
     ) {
         data class RealStorageSection(
             val groups: List<RealStorageGroup> = emptyList(),
@@ -44,32 +37,68 @@ interface BudgetComponent {
             val balances: Long,
             val storages: List<RealStorageModel>
         )
+
+        data class VirtualStorageSection(
+            val storages: List<VirtualStorageModel> = emptyList(),
+            val balances: Long = 0,
+            val buffer: Long = 0,
+        )
+
+        data class DebtSection(
+            val debts: List<DebtModel> = emptyList(),
+            val positiveBalances: Long = 0,
+            val negativeBalances: Long = 0
+        )
     }
 
-    sealed class Event {
-
+    sealed interface Event {
+        data object InsertRealStorage : Event
+        data class UpdateRealStorage(val model: RealStorageModel) : Event
+        data object InsertVirtualStorage : Event
+        data class UpdateVirtualStorage(val model: VirtualStorageModel) : Event
+        data object InsertDebt : Event
+        data class UpdateDebt(val model: DebtModel) : Event
     }
+
+    data class FactoryParams(
+        val componentContext: ComponentContext,
+        val navToUpsertRealStorage: (RealStorageModel?) -> Unit,
+        val navToUpsertVirtualStorage: (VirtualStorageModel?) -> Unit,
+        val navToUpsertDebt: (DebtModel?) -> Unit,
+    )
 }
 
-class BudgetComponentImpl(
-    componentContext: ComponentContext,
+class BudgetListComponentImpl(
     private val realStorageRepository: RealStorageRepository,
     private val virtualStorageRepository: VirtualStorageRepository,
     private val debtRepository: DebtRepository,
-) : BudgetComponent, ComponentContext by componentContext {
+    componentContext: ComponentContext,
+    private val navToUpsertRealStorage: (RealStorageModel?) -> Unit,
+    private val navToUpsertVirtualStorage: (VirtualStorageModel?) -> Unit,
+    private val navToUpsertDebt: (DebtModel?) -> Unit,
+) : BudgetListComponent, ComponentContext by componentContext {
 
     override val state = MutableStateFlow(State())
 
     private val scope = componentCoroutineScope()
 
-    override fun onEvent(event: BudgetComponent.Event) {}
+    override fun onEvent(event: BudgetListComponent.Event) {
+        when (event) {
+            BudgetListComponent.Event.InsertRealStorage -> navToUpsertRealStorage(null)
+            is BudgetListComponent.Event.UpdateRealStorage -> navToUpsertRealStorage(event.model)
+            BudgetListComponent.Event.InsertVirtualStorage -> navToUpsertVirtualStorage(null)
+            is BudgetListComponent.Event.UpdateVirtualStorage -> navToUpsertVirtualStorage(event.model)
+            BudgetListComponent.Event.InsertDebt -> navToUpsertDebt(null)
+            is BudgetListComponent.Event.UpdateDebt -> navToUpsertDebt(event.model)
+        }
+    }
 
     private fun updateBuffer() {
         state.update { current ->
-            val buffer = current.realStorageSection.balances + current.debtsPositiveSum +
-                    current.debtsNegativeSum - current.virtualBalancesSum
+            val buffer = current.realStorageSection.balances + current.debtSection.positiveBalances +
+                    current.debtSection.negativeBalances - current.virtualStorageSection.balances
             current.copy(
-                buffer = buffer
+                virtualStorageSection = current.virtualStorageSection.copy(buffer = buffer)
             )
         }
     }
@@ -79,8 +108,7 @@ class BudgetComponentImpl(
         realStorageRepository.getAll()
             .distinctUntilChanged()
             .onEach { items ->
-
-                val realStorages = items
+                val groups = items
                     .groupBy { item -> item.accessibility }
                     .entries.map { entry ->
                         State.RealStorageGroup(
@@ -97,17 +125,16 @@ class BudgetComponentImpl(
                             Accessibility.LOCKED -> 3
                         }
                     }
-                val balances = realStorages.sumOf { it.balances }
+                val balances = groups.sumOf { it.balances }
 
                 var bufferIsNeedUpdate = false
                 state.update { current ->
                     bufferIsNeedUpdate = balances != current.realStorageSection.balances
                     current.copy(
-                        realStorageSection = State.RealStorageSection(
-                            groups = realStorages,
+                        realStorageSection = current.realStorageSection.copy(
+                            groups = groups,
                             balances = balances,
                         )
-
                     )
                 }
                 if (bufferIsNeedUpdate) updateBuffer()
@@ -117,13 +144,15 @@ class BudgetComponentImpl(
         virtualStorageRepository.getAll()
             .distinctUntilChanged()
             .onEach { items ->
-                val virtualBalancesSum = items.sumOf { it.balance }
+                val balances = items.sumOf { it.balance }
                 var bufferIsNeedUpdate = false
                 state.update { current ->
-                    bufferIsNeedUpdate = virtualBalancesSum != current.virtualBalancesSum
+                    bufferIsNeedUpdate = balances != current.virtualStorageSection.balances
                     current.copy(
-                        virtualStorages = items,
-                        virtualBalancesSum = virtualBalancesSum
+                        virtualStorageSection = current.virtualStorageSection.copy(
+                            storages = items,
+                            balances = balances
+                        ),
                     )
                 }
                 if (bufferIsNeedUpdate) updateBuffer()
@@ -133,16 +162,18 @@ class BudgetComponentImpl(
         debtRepository.getAll()
             .distinctUntilChanged()
             .onEach { items ->
-                val debtsPositiveSum = items.sumOf { if (it.balance > 0) it.balance else 0L }
-                val debtsNegativeSum = items.sumOf { if (it.balance < 0) it.balance else 0L }
+                val positiveBalances = items.sumOf { if (it.balance > 0) it.balance else 0L }
+                val negativeBalances = items.sumOf { if (it.balance < 0) it.balance else 0L }
                 var bufferIsNeedUpdate = false
                 state.update { current ->
                     bufferIsNeedUpdate =
-                        debtsPositiveSum != current.debtsPositiveSum || debtsNegativeSum != current.debtsNegativeSum
+                        positiveBalances != current.debtSection.positiveBalances || negativeBalances != current.debtSection.negativeBalances
                     current.copy(
-                        debts = items,
-                        debtsPositiveSum = debtsPositiveSum,
-                        debtsNegativeSum = debtsNegativeSum
+                        debtSection = current.debtSection.copy(
+                            debts = items,
+                            positiveBalances = positiveBalances,
+                            negativeBalances = negativeBalances
+                        ),
                     )
                 }
                 if (bufferIsNeedUpdate) updateBuffer()

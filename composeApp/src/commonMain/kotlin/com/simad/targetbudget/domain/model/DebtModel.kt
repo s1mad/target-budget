@@ -1,5 +1,8 @@
 package com.simad.targetbudget.domain.model
 
+import kotlinx.serialization.Serializable
+
+@Serializable
 data class DebtModel(
     val id: String,
     val name: String,
@@ -8,8 +11,8 @@ data class DebtModel(
     val createdAt: String
 )
 
+@Serializable
 data class DebtInsertModel(
     val name: String,
     val balance: Long,
 )
-
