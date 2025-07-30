@@ -37,17 +37,24 @@ fun moneyStringToLong(input: String): Long {
 fun moneyLongToEasyReadString(value: Long): String {
     val moneyString = moneyLongToString(value)
     val parts = moneyString.split(".")
-    val integerPart = parts[0]
+    var integerPart = parts[0]
+
+    val isNegative = integerPart.startsWith("-")
+    if (isNegative) {
+        integerPart = integerPart.substring(1)
+    }
 
     val formattedInteger = integerPart.reversed()
         .chunked(3)
         .joinToString(" ")
         .reversed()
 
+    val resultInteger = if (isNegative) "-$formattedInteger" else formattedInteger
+
     return if (parts.size > 1) {
-        "$formattedInteger.${parts[1]}"
+        "$resultInteger.${parts[1]}"
     } else {
-        formattedInteger
+        resultInteger
     }
 }
 
@@ -61,5 +68,5 @@ fun BudgetListComponent.State.VirtualStorageSection.balancesEasyRead(): String =
 fun BudgetListComponent.State.VirtualStorageSection.bufferEasyRead(): String = moneyLongToEasyReadString(buffer) + " ₽"
 
 fun DebtModel.balanceEasyRead(): String = moneyLongToEasyReadString(balance) + " ₽"
-fun BudgetListComponent.State.DebtSection.positiveBalancesEasyRead(): String = moneyLongToEasyReadString(positiveBalances) + " ₽"
-fun BudgetListComponent.State.DebtSection.negativeBalancesEasyRead(): String = moneyLongToEasyReadString(negativeBalances) + " ₽"
+fun BudgetListComponent.State.DebtSection.oweMeBalancesEasyRead(): String = moneyLongToEasyReadString(oweMe.balances) + " ₽"
+fun BudgetListComponent.State.DebtSection.oweIBalancesEasyRead(): String = moneyLongToEasyReadString(oweI.balances) + " ₽"

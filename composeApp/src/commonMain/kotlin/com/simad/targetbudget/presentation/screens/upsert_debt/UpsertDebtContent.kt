@@ -56,7 +56,7 @@ fun UpsertDebtContent(
                     component.onEvent(Event.ChangeBalance(new = it))
                 },
                 modifier = Modifier.fillMaxWidth(),
-                label = "Balance",
+                label = "Balance (+ Owe me) (- I owe)",
                 keyboardType = KeyboardType.Number
             )
         }

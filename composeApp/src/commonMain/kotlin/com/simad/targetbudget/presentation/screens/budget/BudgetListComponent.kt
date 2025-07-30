@@ -30,11 +30,13 @@ interface BudgetListComponent {
         data class RealStorageSection(
             val groups: List<RealStorageGroup> = emptyList(),
             val balances: Long = 0,
+            val creditLimits: Long = 0,
         )
 
         data class RealStorageGroup(
             val accessibility: Accessibility,
             val balances: Long,
+            val creditLimits: Long,
             val storages: List<RealStorageModel>
         )
 
@@ -45,9 +47,13 @@ interface BudgetListComponent {
         )
 
         data class DebtSection(
+            val oweMe: DebtGroup = DebtGroup(),
+            val oweI: DebtGroup = DebtGroup()
+        )
+
+        data class DebtGroup(
             val debts: List<DebtModel> = emptyList(),
-            val positiveBalances: Long = 0,
-            val negativeBalances: Long = 0
+            val balances: Long = 0,
         )
     }
 
@@ -95,8 +101,8 @@ class BudgetListComponentImpl(
 
     private fun updateBuffer() {
         state.update { current ->
-            val buffer = current.realStorageSection.balances + current.debtSection.positiveBalances +
-                    current.debtSection.negativeBalances - current.virtualStorageSection.balances
+            val buffer = current.realStorageSection.balances + current.debtSection.oweMe.balances +
+                    current.debtSection.oweI.balances - current.virtualStorageSection.balances
             current.copy(
                 virtualStorageSection = current.virtualStorageSection.copy(buffer = buffer)
             )
@@ -114,6 +120,7 @@ class BudgetListComponentImpl(
                         State.RealStorageGroup(
                             accessibility = entry.key,
                             balances = entry.value.sumOf { it.balance },
+                            creditLimits = entry.value.sumOf { it.creditLimit },
                             storages = entry.value
                         )
                     }
@@ -126,6 +133,7 @@ class BudgetListComponentImpl(
                         }
                     }
                 val balances = groups.sumOf { it.balances }
+                val creditLimits = groups.sumOf { it.creditLimits }
 
                 var bufferIsNeedUpdate = false
                 state.update { current ->
@@ -134,6 +142,7 @@ class BudgetListComponentImpl(
                         realStorageSection = current.realStorageSection.copy(
                             groups = groups,
                             balances = balances,
+                            creditLimits = creditLimits
                         )
                     )
                 }
@@ -162,17 +171,23 @@ class BudgetListComponentImpl(
         debtRepository.getAll()
             .distinctUntilChanged()
             .onEach { items ->
+                val (negative, positive) = items.partition { it.balance < 0L }
                 val positiveBalances = items.sumOf { if (it.balance > 0) it.balance else 0L }
                 val negativeBalances = items.sumOf { if (it.balance < 0) it.balance else 0L }
                 var bufferIsNeedUpdate = false
                 state.update { current ->
                     bufferIsNeedUpdate =
-                        positiveBalances != current.debtSection.positiveBalances || negativeBalances != current.debtSection.negativeBalances
+                        positiveBalances != current.debtSection.oweMe.balances || negativeBalances != current.debtSection.oweI.balances
                     current.copy(
                         debtSection = current.debtSection.copy(
-                            debts = items,
-                            positiveBalances = positiveBalances,
-                            negativeBalances = negativeBalances
+                            oweMe = current.debtSection.oweMe.copy(
+                                debts = positive,
+                                balances = positive.sumOf { it.balance }
+                            ),
+                            oweI = current.debtSection.oweI.copy(
+                                debts = negative,
+                                balances = negative.sumOf { it.balance }
+                            )
                         ),
                     )
                 }
